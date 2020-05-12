@@ -1,2 +1,2 @@
 # node-mock
-Mock full node as an API provider
+Mock full node as an API provider.
