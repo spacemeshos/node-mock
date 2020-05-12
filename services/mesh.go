@@ -38,7 +38,7 @@ func (s MeshService) EpochNumLayers(ctx context.Context, in *empty.Empty) (*pb.S
 	return nil, nil
 }
 
-////////// Streams
+// Setream API =====
 
 // LayerStream Sent each time layer data changes. Designed for heavy-duty clients. Layer with blocks and transactions.
 func (s MeshService) LayerStream(req *empty.Empty, srv pb.MeshService_LayerStreamServer) error {
