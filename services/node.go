@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/golang/protobuf/ptypes/empty"
-	"google.golang.org/grpc/reflection"
 
 	"google.golang.org/grpc"
 
@@ -58,5 +57,5 @@ func (s NodeService) RegisterService(server *grpc.Server) {
 	pb.RegisterNodeServiceServer(server, s)
 
 	// SubscribeOnNewConnections reflection service on gRPC server
-	reflection.Register(server)
+	//reflection.Register(server)
 }

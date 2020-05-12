@@ -33,8 +33,10 @@ type GrpcService struct {
 
 func (s GrpcService) registerServices() {
 	var nodeService services.NodeService
+	var meshService services.MeshService
 
 	nodeService.RegisterService(s.Server)
+	meshService.RegisterService(s.Server)
 }
 
 func (s GrpcService) startServices() error {
