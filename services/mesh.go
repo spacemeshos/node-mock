@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/golang/protobuf/ptypes/empty"
-	"google.golang.org/grpc"
 
 	pb "github.com/spacemeshos/node-mock/spacemesh"
 )
@@ -43,12 +42,4 @@ func (s MeshService) EpochNumLayers(ctx context.Context, in *empty.Empty) (*pb.S
 // LayerStream Sent each time layer data changes. Designed for heavy-duty clients. Layer with blocks and transactions.
 func (s MeshService) LayerStream(req *empty.Empty, srv pb.MeshService_LayerStreamServer) error {
 	return nil
-}
-
-// RegisterService registers the grpc service.
-func (s MeshService) RegisterService(server *grpc.Server) {
-	pb.RegisterMeshServiceServer(server, s)
-
-	// SubscribeOnNewConnections reflection service on gRPC server
-	//reflection.Register(server)
 }

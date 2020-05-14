@@ -6,95 +6,131 @@ import (
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/exp/errors/fmt"
-
 	"google.golang.org/grpc"
 
-	pb "github.com/spacemeshos/node-mock/spacemesh"
+	"github.com/spacemeshos/node-mock/spacemesh"
 )
 
 const mockVersion = "0.0.1"
-const mockBuild = "180"
+const mockBuild = "1"
 
-var mockStatus = pb.NodeStatus{
-	KnownPeers:    5,
+var syncStatusMock = []spacemesh.NodeSyncStatus{
+	{Status: spacemesh.NodeSyncStatus_SYNCING},
+	{Status: spacemesh.NodeSyncStatus_SYNCED},
+	{Status: spacemesh.NodeSyncStatus_NEW_LAYER_VERIFIED},
+	{Status: spacemesh.NodeSyncStatus_NEW_TOP_LAYER},
+	{Status: spacemesh.NodeSyncStatus_NEW_LAYER_VERIFIED},
+}
+
+var syncPosition int
+var syncStatus spacemesh.NodeSyncStatus
+var nodeStatus = spacemesh.NodeStatus{
+	KnownPeers:    50,
 	MinPeers:      1,
-	MaxPeers:      100,
+	MaxPeers:      10,
 	IsSynced:      true,
 	SyncedLayer:   100,
 	CurrentLayer:  100,
-	VerifiedLayer: 100,
+	VerifiedLayer: 90,
 }
+
+var nodeError spacemesh.NodeError
 
 // NodeService -
-type NodeService struct {
-}
+type NodeService struct{}
 
 // Echo returns the response for an echo api request
-func (s NodeService) Echo(ctx context.Context, in *pb.SimpleString) (*pb.SimpleString, error) {
-	return &pb.SimpleString{Value: in.Value}, nil
+func (s NodeService) Echo(ctx context.Context, in *spacemesh.SimpleString) (*spacemesh.SimpleString, error) {
+	return &spacemesh.SimpleString{Value: in.Value}, nil
 }
 
 // Version returns the version of the node software as a semver string
-func (s NodeService) Version(ctx context.Context, in *empty.Empty) (*pb.SimpleString, error) {
-	return &pb.SimpleString{Value: mockVersion}, nil
+func (s NodeService) Version(ctx context.Context, in *empty.Empty) (*spacemesh.SimpleString, error) {
+	return &spacemesh.SimpleString{Value: mockVersion}, nil
 }
 
 // Build returns the github tag or branch used to build the node
-func (s NodeService) Build(ctx context.Context, in *empty.Empty) (*pb.SimpleString, error) {
-	return &pb.SimpleString{Value: mockBuild}, nil
+func (s NodeService) Build(ctx context.Context, in *empty.Empty) (*spacemesh.SimpleString, error) {
+	return &spacemesh.SimpleString{Value: mockBuild}, nil
 }
 
 // Status current node status
-func (s NodeService) Status(context.Context, *empty.Empty) (*pb.NodeStatus, error) {
-	return &mockStatus, nil
+func (s NodeService) Status(ctx context.Context, in *empty.Empty) (*spacemesh.NodeStatus, error) {
+	return &nodeStatus, nil
 }
 
 // SyncStart request that the node start syncing the mesh
-func (s NodeService) SyncStart(context.Context, *empty.Empty) (*empty.Empty, error) {
+func (s NodeService) SyncStart(ctx context.Context, in *empty.Empty) (*empty.Empty, error) {
 	return &empty.Empty{}, nil
 }
 
-// Setream API =====
-
-func statusLoader(svr pb.NodeService_SyncStatusStreamServer) error {
-	var err error
+// SyncStatusStream sync status events
+func (s NodeService) SyncStatusStream(empty *empty.Empty, server spacemesh.NodeService_SyncStatusStreamServer) (err error) {
+	prevStatus := syncStatus
 
 	for {
-		err = svr.Send(&pb.NodeSyncStatus{})
-		if err != nil {
-			fmt.Printf("Send(ERROR): %v\n", err)
+		if prevStatus.Status != syncStatus.Status {
+			err = server.Send(&syncStatus)
+			if err != nil {
+				fmt.Printf("SyncStatusStream(ERROR): %v\n", err)
 
-			break
+				return
+			}
+
+			fmt.Printf("SyncStatusStream(OK): %v\n", syncStatus)
+
+			prevStatus = syncStatus
 		}
 
-		fmt.Printf("Send(OK).\n")
-
-		time.Sleep(10 * time.Second)
+		time.Sleep(1 * time.Second)
 	}
-
-	return err
-}
-
-// SyncStatusStream sync status events
-func (s NodeService) SyncStatusStream(empty *empty.Empty, svr pb.NodeService_SyncStatusStreamServer) error {
-	var err error
-
-	fmt.Printf("SyncStatusStream: %v\n", svr)
-
-	statusLoader(svr)
-
-	return err
 }
 
 // ErrorStream node error events
-func (s NodeService) ErrorStream(empty *empty.Empty, svr pb.NodeService_ErrorStreamServer) error {
-	return nil
+func (s NodeService) ErrorStream(empty *empty.Empty, server spacemesh.NodeService_ErrorStreamServer) (err error) {
+	prevError := nodeError
+
+	for {
+		if prevError.Type != nodeError.Type {
+			err = server.Send(&nodeError)
+			if err != nil {
+				fmt.Printf("ErrorStream(ERROR): %v\n", err)
+
+				return
+			}
+
+			fmt.Printf("ErrorStream(OK): %v\n", syncStatus)
+
+			prevError = nodeError
+		}
+
+		time.Sleep(1 * time.Second)
+	}
 }
 
-// RegisterService registers the grpc service.
-func (s NodeService) RegisterService(server *grpc.Server) {
-	pb.RegisterNodeServiceServer(server, s)
+func updateSyncStatus() {
+	if syncPosition >= len(syncStatusMock) {
+		syncPosition = len(syncStatusMock) - 1
+	}
 
-	// SubscribeOnNewConnections reflection service on gRPC server
-	//reflection.Register(server)
+	syncStatus = syncStatusMock[syncPosition]
+
+	syncPosition++
+}
+
+func statusLoadProducer() {
+	for {
+		updateSyncStatus()
+
+		fmt.Printf("statusLoadProducer: %s\n", syncStatus.Status.String())
+
+		time.Sleep(10 * time.Second)
+	}
+}
+
+// InitNode -
+func InitNode(s *grpc.Server) {
+	go statusLoadProducer()
+
+	spacemesh.RegisterNodeServiceServer(s, NodeService{})
 }
