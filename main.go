@@ -34,6 +34,7 @@ type GrpcService struct {
 func (s GrpcService) registerServices() {
 	services.InitNode(s.Server)
 	services.InitMesh(s.Server)
+	services.InitGlobal(s.Server)
 
 	go services.StatusLoadProducer()
 }
