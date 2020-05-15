@@ -13,8 +13,6 @@ import (
 
 	"github.com/spacemeshos/go-spacemesh/log"
 	"github.com/spacemeshos/node-mock/services"
-
-	"github.com/spacemeshos/node-mock/spacemesh"
 )
 
 var (
@@ -35,8 +33,9 @@ type GrpcService struct {
 
 func (s GrpcService) registerServices() {
 	services.InitNode(s.Server)
+	services.InitMesh(s.Server)
 
-	spacemesh.RegisterMeshServiceServer(s.Server, services.MeshService{})
+	go services.StatusLoadProducer()
 }
 
 func (s GrpcService) startServices() error {

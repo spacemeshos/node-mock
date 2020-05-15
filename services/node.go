@@ -11,31 +11,6 @@ import (
 	"github.com/spacemeshos/node-mock/spacemesh"
 )
 
-const mockVersion = "0.0.1"
-const mockBuild = "1"
-
-var syncStatusMock = []spacemesh.NodeSyncStatus{
-	{Status: spacemesh.NodeSyncStatus_SYNCING},
-	{Status: spacemesh.NodeSyncStatus_SYNCED},
-	{Status: spacemesh.NodeSyncStatus_NEW_LAYER_VERIFIED},
-	{Status: spacemesh.NodeSyncStatus_NEW_TOP_LAYER},
-	{Status: spacemesh.NodeSyncStatus_NEW_LAYER_VERIFIED},
-}
-
-var syncPosition int
-var syncStatus spacemesh.NodeSyncStatus
-var nodeStatus = spacemesh.NodeStatus{
-	KnownPeers:    50,
-	MinPeers:      1,
-	MaxPeers:      10,
-	IsSynced:      true,
-	SyncedLayer:   100,
-	CurrentLayer:  100,
-	VerifiedLayer: 90,
-}
-
-var nodeError spacemesh.NodeError
-
 // NodeService -
 type NodeService struct{}
 
@@ -108,29 +83,7 @@ func (s NodeService) ErrorStream(empty *empty.Empty, server spacemesh.NodeServic
 	}
 }
 
-func updateSyncStatus() {
-	if syncPosition >= len(syncStatusMock) {
-		syncPosition = len(syncStatusMock) - 1
-	}
-
-	syncStatus = syncStatusMock[syncPosition]
-
-	syncPosition++
-}
-
-func statusLoadProducer() {
-	for {
-		updateSyncStatus()
-
-		fmt.Printf("statusLoadProducer: %s\n", syncStatus.Status.String())
-
-		time.Sleep(10 * time.Second)
-	}
-}
-
 // InitNode -
 func InitNode(s *grpc.Server) {
-	go statusLoadProducer()
-
 	spacemesh.RegisterNodeServiceServer(s, NodeService{})
 }
