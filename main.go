@@ -32,11 +32,10 @@ type GrpcService struct {
 }
 
 func (s GrpcService) registerServices() {
-	var nodeService services.NodeService
-	var meshService services.MeshService
+	services.InitNode(s.Server)
+	services.InitMesh(s.Server)
 
-	nodeService.RegisterService(s.Server)
-	meshService.RegisterService(s.Server)
+	go services.StatusLoadProducer()
 }
 
 func (s GrpcService) startServices() error {
