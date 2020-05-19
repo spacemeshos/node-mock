@@ -1,9 +1,9 @@
 package services
 
 import (
+	"encoding/hex"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/spacemeshos/node-mock/spacemesh"
 	"golang.org/x/exp/errors/fmt"
@@ -12,14 +12,6 @@ import (
 
 // GlobalStateService -
 type GlobalStateService struct{}
-
-func createAccount() (account spacemesh.Account) {
-	key, _ := crypto.GenerateKey()
-
-	account.Address.Address = crypto.PubkeyToAddress(key.PublicKey).Bytes()
-
-	return
-}
 
 // AccountStream Account changes (e.g., balance and counter/nonce changes).
 func (s GlobalStateService) AccountStream(emty *empty.Empty, server spacemesh.GlobalStateService_AccountStreamServer) (err error) {
@@ -35,7 +27,7 @@ func (s GlobalStateService) AccountStream(emty *empty.Empty, server spacemesh.Gl
 
 		fmt.Printf("AccountStream(OK): %v\n", account)
 
-		time.Sleep(5 * time.Second)
+		time.Sleep(15 * time.Second)
 	}
 }
 
@@ -46,12 +38,50 @@ func (s GlobalStateService) RewardStream(empty *empty.Empty, server spacemesh.Gl
 
 // TransactionStateStream Transaction State - rejected pre-STF, or pending STF, or processed by STF
 func (s GlobalStateService) TransactionStateStream(empty *empty.Empty, server spacemesh.GlobalStateService_TransactionStateStreamServer) (err error) {
-	return
+	txStateChan, cookie := transactionStateBus.Register()
+	defer transactionStateBus.Delete(cookie)
+
+	for {
+		select {
+		case msg := <-txStateChan:
+			txState := msg.(spacemesh.TransactionState)
+
+			err = server.Send(&txState)
+			if err != nil {
+				fmt.Printf("TransactionStateStream(ERROR): %v\n", err)
+
+				return
+			}
+
+			fmt.Printf("TransactionStateStream(OK): %s\n", txState.String())
+		}
+	}
 }
 
 // TransactionReceiptStream Receipts - emitted after tx was processed by STF (or rejected before STF)
 func (s GlobalStateService) TransactionReceiptStream(empty *empty.Empty, server spacemesh.GlobalStateService_TransactionReceiptStreamServer) (err error) {
-	return
+	txReceiptChan, cookie := transactionReceiptBus.Register()
+	defer transactionReceiptBus.Delete(cookie)
+
+	for {
+		select {
+		case msg := <-txReceiptChan:
+			txReceipt := msg.(spacemesh.TransactionReceipt)
+
+			err = server.Send(&txReceipt)
+			if err != nil {
+				fmt.Printf("TransactionReceiptStream(ERROR): %v\n", err)
+
+				return
+			}
+
+			fmt.Printf("TransactionReceiptStream(OK): %d - %s - %s\n",
+				txReceipt.GetLayerNumber(),
+				hex.EncodeToString(txReceipt.Id.Id),
+				txReceipt.GetResult().String(),
+			)
+		}
+	}
 }
 
 // InitGlobal -

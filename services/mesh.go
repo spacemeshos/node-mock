@@ -2,8 +2,6 @@ package services
 
 import (
 	"context"
-	"reflect"
-	"time"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	"golang.org/x/exp/errors/fmt"
@@ -44,23 +42,24 @@ func (s MeshService) EpochNumLayers(ctx context.Context, in *empty.Empty) (*spac
 
 // LayerStream Sent each time layer data changes. Designed for heavy-duty clients. Layer with blocks and transactions.
 func (s MeshService) LayerStream(req *empty.Empty, server spacemesh.MeshService_LayerStreamServer) (err error) {
-	prevLayer := currentLayer
+	layerChan, cookie := layerBus.Register()
+	defer layerBus.Delete(cookie)
 
 	for {
-		if !reflect.DeepEqual(prevLayer, currentLayer) {
-			err = server.Send(&currentLayer)
+		select {
+		case msg := <-layerChan:
+			layer := msg.(spacemesh.Layer)
+
+			err = server.Send(&layer)
 			if err != nil {
 				fmt.Printf("LayerStream(ERROR): %v\n", err)
 
 				return
 			}
 
-			fmt.Printf("LayerStream(OK): %v\n", currentLayer)
+			fmt.Printf("LayerStream(OK): %d - %s\n", layer.GetNumber(), layer.GetStatus().String())
 
-			prevLayer = currentLayer
 		}
-
-		time.Sleep(1 * time.Second)
 	}
 }
 

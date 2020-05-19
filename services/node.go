@@ -36,15 +36,31 @@ func (s NodeService) Status(ctx context.Context, in *empty.Empty) (*spacemesh.No
 
 // SyncStart request that the node start syncing the mesh
 func (s NodeService) SyncStart(ctx context.Context, in *empty.Empty) (*empty.Empty, error) {
+	if len(layers) == 0 {
+		fmt.Printf("NodeService.SyncStart\n")
+
+		syncStatusBus.Send(
+			spacemesh.NodeSyncStatus{
+				Status: spacemesh.NodeSyncStatus_SYNCING,
+			},
+		)
+
+		go startLoadProducer()
+	}
+
 	return &empty.Empty{}, nil
 }
 
 // SyncStatusStream sync status events
 func (s NodeService) SyncStatusStream(empty *empty.Empty, server spacemesh.NodeService_SyncStatusStreamServer) (err error) {
-	prevStatus := syncStatus
+	syncStatusChan, cookie := syncStatusBus.Register()
+	defer syncStatusBus.Delete(cookie)
 
 	for {
-		if prevStatus.Status != syncStatus.Status {
+		select {
+		case msg := <-syncStatusChan:
+			syncStatus := msg.(spacemesh.NodeSyncStatus)
+
 			err = server.Send(&syncStatus)
 			if err != nil {
 				fmt.Printf("SyncStatusStream(ERROR): %v\n", err)
@@ -54,10 +70,7 @@ func (s NodeService) SyncStatusStream(empty *empty.Empty, server spacemesh.NodeS
 
 			fmt.Printf("SyncStatusStream(OK): %v\n", syncStatus)
 
-			prevStatus = syncStatus
 		}
-
-		time.Sleep(1 * time.Second)
 	}
 }
 
@@ -74,7 +87,7 @@ func (s NodeService) ErrorStream(empty *empty.Empty, server spacemesh.NodeServic
 				return
 			}
 
-			fmt.Printf("ErrorStream(OK): %v\n", syncStatus)
+			fmt.Printf("ErrorStream(OK): %v\n", nodeError)
 
 			prevError = nodeError
 		}
