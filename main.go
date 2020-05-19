@@ -31,13 +31,6 @@ type GrpcService struct {
 	Port   uint
 }
 
-func (s GrpcService) registerServices() {
-	services.InitNode(s.Server)
-	services.InitMesh(s.Server)
-
-	go services.StatusLoadProducer()
-}
-
 func (s GrpcService) startServices() error {
 	addr := ":" + strconv.Itoa(int(s.Port))
 
@@ -82,7 +75,8 @@ func NewGrpcService(port uint) *GrpcService {
 func startServer(port uint) *GrpcService {
 	grpcService := NewGrpcService(port)
 
-	grpcService.registerServices()
+	services.InitMocker(grpcService.Server)
+
 	grpcService.startServices()
 
 	return grpcService
