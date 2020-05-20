@@ -6,7 +6,8 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/spacemeshos/ed25519"
+
 	"github.com/spacemeshos/node-mock/spacemesh"
 	"github.com/spacemeshos/node-mock/utils"
 	"google.golang.org/grpc"
@@ -66,9 +67,9 @@ var transactionStateBus utils.Bus
 var transactionReceiptBus utils.Bus
 
 func createAccount() (account spacemesh.Account) {
-	key, _ := crypto.GenerateKey()
+	publicKey, _, _ := ed25519.GenerateKey(nil)
 
-	account.Address.Address = crypto.PubkeyToAddress(key.PublicKey).Bytes()
+	account.Address.Address = publicKey
 
 	accounts = append(accounts, account)
 
