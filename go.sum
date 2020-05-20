@@ -212,6 +212,7 @@ github.com/smartystreets/assertions v0.0.0-20180927180507-b2de0cb4f26d/go.mod h1
 github.com/smartystreets/goconvey v0.0.0-20190731233626-505e41936337/go.mod h1:syvi0/a8iFYH4r/RixwvyeAJjdLS9QV7WQ/tjFTllLA=
 github.com/soheilhy/cmux v0.1.4/go.mod h1:IM3LyeVVIOuxMH7sFAkER9+bJ4dT7Ms6E4xg4kGIyLM=
 github.com/spacemeshos/api v0.0.0-20200504205047-a122245d9e40 h1:NR/KuyxPo9DkLBxVWK5QuQSo3bye3RCKvbS+TAaVEvk=
+github.com/spacemeshos/ed25519 v0.0.0-20190530014421-e235766d15a1 h1:INBIhbR/39yXEN8WVNfiGZehiKvkML+yrJfFuIwrmbU=
 github.com/spacemeshos/ed25519 v0.0.0-20190530014421-e235766d15a1/go.mod h1:lyZLUyZXvd7gp6KHwGS5ZgtS2ZvV++lBjdE4MLqmLnU=
 github.com/spacemeshos/go-spacemesh v0.1.9 h1:2fX6oMimSeJNaOiripvV8KSawYAtGWmqNJ5Vg6GPRS8=
 github.com/spacemeshos/go-spacemesh v0.1.9/go.mod h1:Xh91TUGPrbMyf0w4KLwYJ1Yi1TYcsUAYK6vtQAC8zEU=

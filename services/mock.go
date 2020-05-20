@@ -56,13 +56,19 @@ type transactionInfo struct {
 	Receipt     spacemesh.TransactionReceipt
 }
 
-var accounts []spacemesh.Account
+// node
+var syncStatusBus utils.Bus
+
+//mesh
+var layerBus utils.Bus
+
 var layers []*spacemesh.Layer
 var blocks []spacemesh.Block
 var transactions []transactionInfo
 
-var syncStatusBus utils.Bus
-var layerBus utils.Bus
+// global
+var accounts []spacemesh.Account
+var rewards []spacemesh.Reward
 var transactionStateBus utils.Bus
 var transactionReceiptBus utils.Bus
 
