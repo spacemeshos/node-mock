@@ -1,6 +1,8 @@
 package services
 
 import (
+	"encoding/hex"
+	"fmt"
 	"math/rand"
 	"time"
 
@@ -38,7 +40,14 @@ var maxBlocks = 10
 var minTransactions = 1
 var maxTransactions = 10
 
-var currentLayer = spacemesh.Layer{}
+var producerIntervalBS = 1  // seconds
+var producerIntervalAS = 15 // seconds
+
+var maxApprovedLayers = 3
+
+var currentLayer = &spacemesh.Layer{}
+
+var syncThreshold = 10
 
 type transactionInfo struct {
 	Transaction spacemesh.Transaction
@@ -47,7 +56,7 @@ type transactionInfo struct {
 }
 
 var accounts []spacemesh.Account
-var layers []spacemesh.Layer
+var layers []*spacemesh.Layer
 var blocks []spacemesh.Block
 var transactions []transactionInfo
 
@@ -174,12 +183,16 @@ func createLayer() {
 		layerNumber = 0
 	}
 
-	currentLayer = spacemesh.Layer{
+	currentLayer = &spacemesh.Layer{
 		Number:        layerNumber,
 		Status:        spacemesh.Layer_UNKNOWN,
 		Hash:          getRandomBuffer(32),
 		Blocks:        generateBlocks(layerNumber),
 		RootStateHash: getRandomBuffer(32),
+	}
+
+	if !nodeStatus.IsSynced {
+		currentLayer.Status = spacemesh.Layer_CONFIRMED
 	}
 
 	syncStatusBus.Send(
@@ -188,22 +201,82 @@ func createLayer() {
 		},
 	)
 
-	layerBus.Send(currentLayer)
+	layerBus.Send(*currentLayer)
 
 	layers = append(layers, currentLayer)
 }
 
-func updateLayers() {
+func getLayerStatus(status spacemesh.Layer_LayerStatus) int {
+	var result int
 
+	for _, v := range layers {
+		if v.Status == status {
+			result++
+		}
+	}
+
+	return result
+}
+
+func printLayers() {
+	fmt.Println("-- Layers --")
+
+	for _, v := range layers {
+		fmt.Printf("%d - %s - %s\n", v.GetNumber(), hex.EncodeToString(v.GetHash()), v.GetStatus().String())
+	}
+
+	fmt.Println("-- ------ --")
+}
+
+func updateLayers() {
+	al := getLayerStatus(spacemesh.Layer_APPROVED)
+
+	if al > maxApprovedLayers {
+		for _, v := range layers {
+			if v.Status == spacemesh.Layer_APPROVED {
+				v.Status = spacemesh.Layer_CONFIRMED
+
+				layerBus.Send(*v)
+
+				al--
+
+				if al <= maxApprovedLayers {
+					break
+				}
+			}
+		}
+	}
+
+	for _, v := range layers {
+		if v.Status == spacemesh.Layer_UNKNOWN {
+			v.Status = spacemesh.Layer_APPROVED
+
+			layerBus.Send(*v)
+		}
+	}
 }
 
 func startLoadProducer() {
 	for {
-		createLayer()
-
 		updateLayers()
 
-		time.Sleep(15 * time.Second)
+		createLayer()
+
+		if (!nodeStatus.IsSynced) && (len(layers) == syncThreshold) {
+			syncStatusBus.Send(
+				spacemesh.NodeSyncStatus{
+					Status: spacemesh.NodeSyncStatus_SYNCED,
+				},
+			)
+
+			nodeStatus.IsSynced = true
+		}
+
+		if len(layers) < syncThreshold {
+			time.Sleep((time.Duration)(producerIntervalBS) * time.Second)
+		} else {
+			time.Sleep((time.Duration)(producerIntervalAS) * time.Second)
+		}
 	}
 }
 
