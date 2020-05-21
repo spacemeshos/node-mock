@@ -41,6 +41,9 @@ var maxBlocks = 10
 var minTransactions = 1
 var maxTransactions = 10
 
+var minRewards = 5
+var maxRewards = 10
+
 var producerIntervalBS = 1  // seconds
 var producerIntervalAS = 15 // seconds
 
@@ -67,15 +70,29 @@ var blocks []spacemesh.Block
 var transactions []transactionInfo
 
 // global
-var accounts []spacemesh.Account
-var rewards []spacemesh.Reward
+var rewardBus utils.Bus
 var transactionStateBus utils.Bus
 var transactionReceiptBus utils.Bus
+
+var accounts []spacemesh.Account
+var rewards []spacemesh.Reward
+
+func printAccounts() {
+
+}
 
 func createAccount() (account spacemesh.Account) {
 	publicKey, _, _ := ed25519.GenerateKey(nil)
 
-	account.Address.Address = publicKey
+	//rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	accountID := spacemesh.AccountId{
+		Address: publicKey,
+	}
+
+	account = spacemesh.Account{
+		Address: &accountID,
+	}
 
 	accounts = append(accounts, account)
 
@@ -179,6 +196,46 @@ func generateBlocks(layer uint64) []*spacemesh.Block {
 	return result
 }
 
+func getAccount() *spacemesh.AccountId {
+	if len(accounts) < 100 {
+		return createAccount().Address
+	}
+	return accounts[rand.Intn(len(accounts))].Address
+}
+
+func getSmesher() *spacemesh.SmesherId {
+	var smesher spacemesh.SmesherId
+
+	accountID := getAccount()
+
+	smesher.Id = accountID.Address
+
+	return &smesher
+}
+
+func generateRewards(layer uint64) {
+	count := rand.Intn(maxRewards-minRewards) + minRewards
+
+	for i := 0; i < count; i++ {
+		reward := spacemesh.Reward{
+			Layer: layer,
+			Total: &spacemesh.Amount{
+				Value: 10,
+			},
+			LayerReward: &spacemesh.Amount{
+				Value: 9,
+			},
+			LayerComputed: layer,
+			Coinbase:      getAccount(),
+			Smesher:       getSmesher(),
+		}
+
+		rewards = append(rewards, reward)
+
+		rewardBus.Send(reward)
+	}
+}
+
 func createLayer() {
 	var layerNumber uint64
 
@@ -209,6 +266,8 @@ func createLayer() {
 	)
 
 	layerBus.Send(*currentLayer)
+
+	generateRewards(currentLayer.Number)
 
 	layers = append(layers, currentLayer)
 }
@@ -244,6 +303,8 @@ func updateLayers() {
 				v.Status = spacemesh.Layer_CONFIRMED
 
 				layerBus.Send(*v)
+
+				generateRewards(v.Number)
 
 				al--
 
@@ -297,6 +358,7 @@ func InitMocker(server *grpc.Server) {
 
 	syncStatusBus.Init()
 	layerBus.Init()
+	rewardBus.Init()
 	transactionStateBus.Init()
 	transactionReceiptBus.Init()
 }

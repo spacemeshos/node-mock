@@ -33,7 +33,24 @@ func (s GlobalStateService) AccountStream(emty *empty.Empty, server spacemesh.Gl
 
 // RewardStream Rewards are computed by the protocol outside the STF but are a special case and are passed through the STF since they touch account balances.
 func (s GlobalStateService) RewardStream(empty *empty.Empty, server spacemesh.GlobalStateService_RewardStreamServer) (err error) {
-	return
+	rewardChan, cookie := rewardBus.Register()
+	defer rewardBus.Delete(cookie)
+
+	for {
+		select {
+		case msg := <-rewardChan:
+			reward := msg.(spacemesh.Reward)
+
+			err = server.Send(&reward)
+			if err != nil {
+				fmt.Printf("RewardStream(ERROR): %v\n", err)
+
+				return
+			}
+
+			fmt.Printf("RewardStream(OK): %d - %d - %s\n", reward.GetLayer(), reward.GetLayerComputed(), reward.GetTotal().String())
+		}
+	}
 }
 
 // TransactionStateStream Transaction State - rejected pre-STF, or pending STF, or processed by STF
