@@ -1,8 +1,6 @@
 package services
 
 import (
-	"encoding/hex"
-	"fmt"
 	"math/rand"
 	"time"
 
@@ -76,10 +74,6 @@ var transactionReceiptBus utils.Bus
 
 var accounts []spacemesh.Account
 var rewards []spacemesh.Reward
-
-func printAccounts() {
-
-}
 
 func createAccount() (account spacemesh.Account) {
 	publicKey, _, _ := ed25519.GenerateKey(nil)
@@ -282,16 +276,6 @@ func getLayerStatus(status spacemesh.Layer_LayerStatus) int {
 	}
 
 	return result
-}
-
-func printLayers() {
-	fmt.Println("-- Layers --")
-
-	for _, v := range layers {
-		fmt.Printf("%d - %s - %s\n", v.GetNumber(), hex.EncodeToString(v.GetHash()), v.GetStatus().String())
-	}
-
-	fmt.Println("-- ------ --")
 }
 
 func updateLayers() {
