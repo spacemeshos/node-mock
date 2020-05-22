@@ -1,1 +1,5 @@
 rpcPort = 9990
+
+[Producer]
+BeforeThreshold = 100
+AfterThreshold = 15000

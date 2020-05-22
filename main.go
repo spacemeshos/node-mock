@@ -82,6 +82,10 @@ func startServer(port uint) *GrpcService {
 	return grpcService
 }
 
+func initConfig() {
+	services.ProducerIntervalBS = config.LoadProducer.BeforeThreshold
+}
+
 func main() {
 	flag.Parse()
 
@@ -90,11 +94,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	config, err := initConfig(*flagConfig)
+	config, err := parseConfig(*flagConfig)
 	if err != nil {
 		fmt.Printf("ERROR: %v\n", err)
 		os.Exit(1)
 	}
+
+	initConfig()
 
 	if *flagServer {
 		startServer(config.RPCPort)

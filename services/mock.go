@@ -42,8 +42,10 @@ var maxTransactions = 10
 var minRewards = 5
 var maxRewards = 10
 
-var producerIntervalBS = 1  // seconds
-var producerIntervalAS = 15 // seconds
+// ProducerIntervalBS -
+var ProducerIntervalBS = 100 // mseconds
+// ProducerIntervalAS -
+var ProducerIntervalAS = 15000 // mseconds
 
 var maxApprovedLayers = 3
 
@@ -325,9 +327,9 @@ func startLoadProducer() {
 		}
 
 		if len(layers) < syncThreshold {
-			time.Sleep((time.Duration)(producerIntervalBS) * time.Second)
+			time.Sleep((time.Duration)(ProducerIntervalBS) * time.Millisecond)
 		} else {
-			time.Sleep((time.Duration)(producerIntervalAS) * time.Second)
+			time.Sleep((time.Duration)(ProducerIntervalAS) * time.Millisecond)
 		}
 	}
 }

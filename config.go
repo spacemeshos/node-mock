@@ -7,9 +7,16 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-type config struct {
-	RPCPort uint
+// Config -
+type Config struct {
+	RPCPort      uint
+	LoadProducer struct {
+		BeforeThreshold int
+		AfterThreshold  int
+	}
 }
+
+var config Config
 
 // ConfigError config read and parse errors
 type ConfigError string
@@ -26,8 +33,8 @@ func fileExists(filename string) bool {
 	return !info.IsDir()
 }
 
-func initConfig(fileName string) (*config, error) {
-	var config config
+func parseConfig(fileName string) (*Config, error) {
+	var config Config
 
 	if !fileExists(fileName) {
 		return nil, ConfigError(fmt.Sprintf("can`t find config file '%s'", fileName))
