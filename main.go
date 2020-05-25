@@ -99,6 +99,6 @@ func main() {
 	}
 
 	if *flagServer {
-		startServer(config.RPCPort)
+		startServer(services.Config.RPCPort)
 	}
 }

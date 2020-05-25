@@ -8,8 +8,6 @@ import (
 	"github.com/spacemeshos/node-mock/services"
 )
 
-var config services.Configuration
-
 // ConfigError config read and parse errors
 type ConfigError string
 
