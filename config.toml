@@ -11,6 +11,7 @@ Sync = 100
 [Transactions]
 Min = 1
 Max = 10
+MaxPerSecond = 10000
 
 [Blocks]
 Min = 1

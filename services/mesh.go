@@ -38,6 +38,11 @@ func (s MeshService) EpochNumLayers(ctx context.Context, in *empty.Empty) (*spac
 	return &spacemesh.SimpleInt{Value: Config.Layers.PerEpoch}, nil
 }
 
+// MaxTransactionsPerSecond Number of transactions per second (a network parameter)
+func (s MeshService) MaxTransactionsPerSecond(ctx context.Context, in *empty.Empty) (*spacemesh.SimpleInt, error) {
+	return &spacemesh.SimpleInt{Value: Config.Transactions.MaxPerSecond}, nil
+}
+
 // Setream API =====
 
 // LayerStream Sent each time layer data changes. Designed for heavy-duty clients. Layer with blocks and transactions.

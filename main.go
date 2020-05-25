@@ -82,41 +82,21 @@ func startServer(port uint) *GrpcService {
 	return grpcService
 }
 
-func initConfig(config *services.Configuration) {
-	services.Config.Threshold.Before = config.Threshold.Before
-	services.Config.Threshold.After = config.Threshold.After
-	services.Config.Threshold.Sync = config.Threshold.Sync
-
-	services.Config.Transactions.Min = config.Transactions.Min
-	services.Config.Transactions.Max = config.Transactions.Max
-
-	services.Config.Blocks.Min = config.Blocks.Min
-	services.Config.Blocks.Max = config.Blocks.Max
-
-	services.Config.Rewards.Min = config.Rewards.Min
-	services.Config.Rewards.Max = config.Rewards.Max
-
-	services.Config.Version = config.Version
-	services.Config.Build = config.Build
-
-	services.Config.NetID = config.NetID
-}
-
 func main() {
 	flag.Parse()
+
+	var err error
 
 	if len(*flagConfig) == 0 {
 		fmt.Println("ERROR: -config is mandatory")
 		os.Exit(1)
 	}
 
-	config, err := parseConfig(*flagConfig)
+	services.Config, err = parseConfig(*flagConfig)
 	if err != nil {
 		fmt.Printf("ERROR: %v\n", err)
 		os.Exit(1)
 	}
-
-	initConfig(config)
 
 	if *flagServer {
 		startServer(config.RPCPort)

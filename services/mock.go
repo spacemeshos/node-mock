@@ -23,8 +23,9 @@ type Configuration struct {
 		After  int
 	}
 	Transactions struct {
-		Min int
-		Max int
+		Min          int
+		Max          int
+		MaxPerSecond uint64
 	}
 	Blocks struct {
 		Min int
@@ -41,7 +42,7 @@ type Configuration struct {
 }
 
 // Config -
-var Config Configuration
+var Config *Configuration
 
 var nodeStatus = spacemesh.NodeStatus{
 	KnownPeers:    1,
@@ -261,12 +262,6 @@ func createLayer() {
 	if !nodeStatus.IsSynced {
 		currentLayer.Status = spacemesh.Layer_CONFIRMED
 	}
-
-	syncStatusBus.Send(
-		spacemesh.NodeSyncStatus{
-			Status: spacemesh.NodeSyncStatus_NEW_TOP_LAYER,
-		},
-	)
 
 	layerBus.Send(*currentLayer)
 
