@@ -82,8 +82,24 @@ func startServer(port uint) *GrpcService {
 	return grpcService
 }
 
-func initConfig() {
-	services.ProducerIntervalBS = config.LoadProducer.BeforeThreshold
+func initConfig(config *services.Configuration) {
+	services.Config.Threshold.Before = config.Threshold.Before
+	services.Config.Threshold.After = config.Threshold.After
+	services.Config.Threshold.Sync = config.Threshold.Sync
+
+	services.Config.Transactions.Min = config.Transactions.Min
+	services.Config.Transactions.Max = config.Transactions.Max
+
+	services.Config.Blocks.Min = config.Blocks.Min
+	services.Config.Blocks.Max = config.Blocks.Max
+
+	services.Config.Rewards.Min = config.Rewards.Min
+	services.Config.Rewards.Max = config.Rewards.Max
+
+	services.Config.Version = config.Version
+	services.Config.Build = config.Build
+
+	services.Config.NetID = config.NetID
 }
 
 func main() {
@@ -100,7 +116,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	initConfig()
+	initConfig(config)
 
 	if *flagServer {
 		startServer(config.RPCPort)

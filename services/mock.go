@@ -11,8 +11,37 @@ import (
 	"google.golang.org/grpc"
 )
 
-const mockVersion = "0.0.1"
-const mockBuild = "1"
+// Configuration -
+type Configuration struct {
+	Version   string
+	Build     string
+	NetID     uint64
+	RPCPort   uint
+	Threshold struct {
+		Sync   int
+		Before int
+		After  int
+	}
+	Transactions struct {
+		Min int
+		Max int
+	}
+	Blocks struct {
+		Min int
+		Max int
+	}
+	Rewards struct {
+		Min int
+		Max int
+	}
+	Layers struct {
+		PerEpoch    uint64
+		MaxApproved int
+	}
+}
+
+// Config -
+var Config Configuration
 
 var nodeStatus = spacemesh.NodeStatus{
 	KnownPeers:    1,
@@ -30,28 +59,7 @@ var genesisTime = time.Now()
 
 var currentEpoch uint64
 
-var netID uint64 = 1
-var layersPerEpoch uint64 = 10
-
-var minBlocks = 1
-var maxBlocks = 10
-
-var minTransactions = 1
-var maxTransactions = 10
-
-var minRewards = 5
-var maxRewards = 10
-
-// ProducerIntervalBS -
-var ProducerIntervalBS = 100 // mseconds
-// ProducerIntervalAS -
-var ProducerIntervalAS = 15000 // mseconds
-
-var maxApprovedLayers = 3
-
 var currentLayer = &spacemesh.Layer{}
-
-var syncThreshold = 10
 
 type transactionInfo struct {
 	Transaction spacemesh.Transaction
@@ -129,7 +137,7 @@ func transactionStateToResult(state spacemesh.TransactionState_TransactionStateT
 }
 
 func generateTransactions(layer uint64) []*spacemesh.Transaction {
-	count := rand.Intn(maxTransactions-minTransactions) + minTransactions
+	count := rand.Intn(Config.Transactions.Max-Config.Transactions.Min) + Config.Transactions.Min
 
 	result := make([]*spacemesh.Transaction, count)
 
@@ -174,8 +182,7 @@ func generateTransactions(layer uint64) []*spacemesh.Transaction {
 }
 
 func generateBlocks(layer uint64) []*spacemesh.Block {
-	count := rand.Intn(maxBlocks-minBlocks) + minBlocks
-
+	count := rand.Intn(Config.Blocks.Max-Config.Blocks.Min) + Config.Blocks.Min
 	result := make([]*spacemesh.Block, count)
 
 	for i := 0; i < count; i++ {
@@ -210,7 +217,7 @@ func getSmesher() *spacemesh.SmesherId {
 }
 
 func generateRewards(layer uint64) {
-	count := rand.Intn(maxRewards-minRewards) + minRewards
+	count := rand.Intn(Config.Rewards.Max-Config.Rewards.Min) + Config.Rewards.Min
 
 	for i := 0; i < count; i++ {
 		reward := spacemesh.Reward{
@@ -283,7 +290,7 @@ func getLayerStatus(status spacemesh.Layer_LayerStatus) int {
 func updateLayers() {
 	al := getLayerStatus(spacemesh.Layer_APPROVED)
 
-	if al > maxApprovedLayers {
+	if al > Config.Layers.MaxApproved {
 		for _, v := range layers {
 			if v.Status == spacemesh.Layer_APPROVED {
 				v.Status = spacemesh.Layer_CONFIRMED
@@ -294,7 +301,7 @@ func updateLayers() {
 
 				al--
 
-				if al <= maxApprovedLayers {
+				if al <= Config.Layers.MaxApproved {
 					break
 				}
 			}
@@ -316,7 +323,7 @@ func startLoadProducer() {
 
 		createLayer()
 
-		if (!nodeStatus.IsSynced) && (len(layers) == syncThreshold) {
+		if (!nodeStatus.IsSynced) && (len(layers) == Config.Threshold.Sync) {
 			syncStatusBus.Send(
 				spacemesh.NodeSyncStatus{
 					Status: spacemesh.NodeSyncStatus_SYNCED,
@@ -326,10 +333,10 @@ func startLoadProducer() {
 			nodeStatus.IsSynced = true
 		}
 
-		if len(layers) < syncThreshold {
-			time.Sleep((time.Duration)(ProducerIntervalBS) * time.Millisecond)
+		if len(layers) < Config.Threshold.Sync {
+			time.Sleep((time.Duration)(Config.Threshold.Before) * time.Millisecond)
 		} else {
-			time.Sleep((time.Duration)(ProducerIntervalAS) * time.Millisecond)
+			time.Sleep((time.Duration)(Config.Threshold.After) * time.Millisecond)
 		}
 	}
 }

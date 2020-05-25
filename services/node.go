@@ -21,12 +21,12 @@ func (s NodeService) Echo(ctx context.Context, in *spacemesh.SimpleString) (*spa
 
 // Version returns the version of the node software as a semver string
 func (s NodeService) Version(ctx context.Context, in *empty.Empty) (*spacemesh.SimpleString, error) {
-	return &spacemesh.SimpleString{Value: mockVersion}, nil
+	return &spacemesh.SimpleString{Value: Config.Version}, nil
 }
 
 // Build returns the github tag or branch used to build the node
 func (s NodeService) Build(ctx context.Context, in *empty.Empty) (*spacemesh.SimpleString, error) {
-	return &spacemesh.SimpleString{Value: mockBuild}, nil
+	return &spacemesh.SimpleString{Value: Config.Build}, nil
 }
 
 // Status current node status

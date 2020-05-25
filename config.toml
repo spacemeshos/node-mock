@@ -1,5 +1,25 @@
 rpcPort = 9990
+Version = "0.0.1"
+Build = "1"
+NetID = 1
 
-[Producer]
-BeforeThreshold = 100
-AfterThreshold = 15000
+[Threshold]
+Before = 100
+After = 15001
+Sync = 100
+
+[Transactions]
+Min = 1
+Max = 10
+
+[Blocks]
+Min = 1
+Max = 10
+
+[Rewards]
+Min = 1
+Max = 10
+
+[Layers]
+PerEpoc = 100
+MaxApproved = 3

@@ -5,18 +5,10 @@ import (
 	"os"
 
 	"github.com/BurntSushi/toml"
+	"github.com/spacemeshos/node-mock/services"
 )
 
-// Config -
-type Config struct {
-	RPCPort      uint
-	LoadProducer struct {
-		BeforeThreshold int
-		AfterThreshold  int
-	}
-}
-
-var config Config
+var config services.Configuration
 
 // ConfigError config read and parse errors
 type ConfigError string
@@ -33,8 +25,8 @@ func fileExists(filename string) bool {
 	return !info.IsDir()
 }
 
-func parseConfig(fileName string) (*Config, error) {
-	var config Config
+func parseConfig(fileName string) (*services.Configuration, error) {
+	var config services.Configuration
 
 	if !fileExists(fileName) {
 		return nil, ConfigError(fmt.Sprintf("can`t find config file '%s'", fileName))

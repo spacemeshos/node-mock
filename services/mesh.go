@@ -30,12 +30,12 @@ func (s MeshService) CurrentEpoch(ctx context.Context, in *empty.Empty) (*spacem
 
 // NetId Network ID
 func (s MeshService) NetId(ctx context.Context, in *empty.Empty) (*spacemesh.SimpleInt, error) {
-	return &spacemesh.SimpleInt{Value: netID}, nil
+	return &spacemesh.SimpleInt{Value: Config.NetID}, nil
 }
 
 // EpochNumLayers Number of layers per epoch (a network parameter)
 func (s MeshService) EpochNumLayers(ctx context.Context, in *empty.Empty) (*spacemesh.SimpleInt, error) {
-	return &spacemesh.SimpleInt{Value: layersPerEpoch}, nil
+	return &spacemesh.SimpleInt{Value: Config.Layers.PerEpoch}, nil
 }
 
 // Setream API =====
