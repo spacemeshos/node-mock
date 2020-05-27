@@ -1,6 +1,8 @@
 package services
 
 import (
+	"bytes"
+	"encoding/json"
 	"math/rand"
 	"time"
 
@@ -9,6 +11,8 @@ import (
 	"github.com/spacemeshos/node-mock/spacemesh"
 	"github.com/spacemeshos/node-mock/utils"
 	"google.golang.org/grpc"
+
+	"github.com/spacemeshos/go-spacemesh/common/types"
 )
 
 // Configuration -
@@ -38,6 +42,9 @@ type Configuration struct {
 	Layers struct {
 		PerEpoch    uint64
 		MaxApproved int
+	}
+	Smeshers struct {
+		PoolSize int
 	}
 }
 
@@ -85,6 +92,8 @@ var transactionReceiptBus utils.Bus
 
 var accounts []spacemesh.Account
 var rewards []spacemesh.Reward
+
+var smeshers []spacemesh.SmesherId
 
 func createAccount() (account spacemesh.Account) {
 	publicKey, _, _ := ed25519.GenerateKey(nil)
@@ -137,32 +146,104 @@ func transactionStateToResult(state spacemesh.TransactionState_TransactionStateT
 	}
 }
 
+func generateAtxID() (result types.AtxId) {
+	for i := 0; i < len(result); i++ {
+		result[i] = (byte)(rand.Intn(255))
+	}
+
+	return
+}
+
+func addrConvert(addr spacemesh.AccountId) (result types.Address) {
+	for i := 0; i < len(result); i++ {
+		result[i] = addr.Address[i]
+	}
+
+	return
+}
+
+func generateATX(layer uint64) []byte {
+	account := getAccount()
+
+	data := types.ActivationTxHeader{
+		NIPSTChallenge: types.NIPSTChallenge{
+			NodeId: types.NodeId{
+				Key:          account.String(),
+				VRFPublicKey: account.GetAddress(),
+			},
+			PubLayerIdx:          (types.LayerID)(layer),
+			CommitmentMerkleRoot: getRandomBuffer(32),
+		},
+		Coinbase:      addrConvert(*account),
+		ActiveSetSize: (uint32)(rand.Intn(5)),
+	}
+
+	result := new(bytes.Buffer)
+
+	encoder := json.NewEncoder(result)
+
+	encoder.Encode(&data)
+
+	return result.Bytes()
+}
+
+func generateTransaction(
+	txType spacemesh.Transaction_TransactionType,
+	layerNumber uint64,
+) (result *transactionInfo) {
+	tx := spacemesh.Transaction{
+		Type: txType,
+		Id: &spacemesh.TransactionId{
+			Id: getRandomBuffer(32),
+		},
+	}
+
+	txState := spacemesh.TransactionState{
+		Id: tx.Id,
+	}
+
+	if txType == spacemesh.Transaction_SIMPLE {
+		txState.State = getTransactionState()
+	} else {
+		txState.State = spacemesh.TransactionState_PROCESSED
+	}
+
+	result = &transactionInfo{
+		Transaction: tx,
+		State: spacemesh.TransactionState{
+			State: txState.State,
+		},
+		Receipt: spacemesh.TransactionReceipt{
+			Id:          txState.Id,
+			Result:      transactionStateToResult(txState.State),
+			GasUsed:     1000,
+			LayerNumber: layerNumber,
+		},
+	}
+
+	if txType == spacemesh.Transaction_ATX {
+		result.Transaction.PrevAtx = &spacemesh.TransactionId{
+			Id: getRandomBuffer(32),
+		}
+
+		result.Transaction.Data = generateATX(layerNumber)
+	}
+
+	return
+}
+
 func generateTransactions(layer uint64) []*spacemesh.Transaction {
 	count := rand.Intn(Config.Transactions.Max-Config.Transactions.Min) + Config.Transactions.Min
 
 	result := make([]*spacemesh.Transaction, count)
 
+	var txInfo *transactionInfo
+
 	for i := 0; i < count; i++ {
-		tx := spacemesh.Transaction{
-			Type: spacemesh.Transaction_SIMPLE,
-			Id: &spacemesh.TransactionId{
-				Id: getRandomBuffer(32),
-			},
-		}
-
-		txState := getTransactionState()
-
-		txInfo := transactionInfo{
-			Transaction: tx,
-			State: spacemesh.TransactionState{
-				State: txState,
-			},
-			Receipt: spacemesh.TransactionReceipt{
-				Id:          tx.Id,
-				Result:      transactionStateToResult(txState),
-				GasUsed:     1000,
-				LayerNumber: layer,
-			},
+		if i == 0 {
+			txInfo = generateTransaction(spacemesh.Transaction_ATX, layer)
+		} else {
+			txInfo = generateTransaction(spacemesh.Transaction_SIMPLE, layer)
 		}
 
 		transactionStateBus.Send(txInfo.State)
@@ -173,10 +254,10 @@ func generateTransactions(layer uint64) []*spacemesh.Transaction {
 
 		transactions = append(
 			transactions,
-			txInfo,
+			*txInfo,
 		)
 
-		result[i] = &tx
+		result[i] = &txInfo.Transaction
 	}
 
 	return result
@@ -205,16 +286,6 @@ func getAccount() *spacemesh.AccountId {
 		return createAccount().Address
 	}
 	return accounts[rand.Intn(len(accounts))].Address
-}
-
-func getSmesher() *spacemesh.SmesherId {
-	var smesher spacemesh.SmesherId
-
-	accountID := getAccount()
-
-	smesher.Id = accountID.Address
-
-	return &smesher
 }
 
 func generateRewards(layer uint64) {
@@ -336,6 +407,27 @@ func startLoadProducer() {
 	}
 }
 
+func createSmesher() *spacemesh.SmesherId {
+	var smesher spacemesh.SmesherId
+
+	accountID := getAccount()
+
+	smesher.Id = accountID.Address
+
+	return &smesher
+}
+
+func getSmesher() *spacemesh.SmesherId {
+	return &smeshers[rand.Intn(len(smeshers))]
+}
+
+func generateSmeshers() {
+	for i := 0; i < Config.Smeshers.PoolSize; i++ {
+
+		smeshers = append(smeshers, *createSmesher())
+	}
+}
+
 // InitMocker -
 func InitMocker(server *grpc.Server) {
 	InitNode(server)
@@ -343,6 +435,8 @@ func InitMocker(server *grpc.Server) {
 	InitGlobal(server)
 
 	rand.Seed(time.Now().UnixNano())
+
+	generateSmeshers()
 
 	syncStatusBus.Init()
 	layerBus.Init()

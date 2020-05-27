@@ -24,3 +24,6 @@ Max = 10
 [Layers]
 PerEpoc = 100
 MaxApproved = 3
+
+[Smeshers]
+PoolSize = 100
