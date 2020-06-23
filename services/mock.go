@@ -8,11 +8,13 @@ import (
 
 	"github.com/spacemeshos/ed25519"
 
-	"github.com/spacemeshos/node-mock/spacemesh"
-	"github.com/spacemeshos/node-mock/utils"
 	"google.golang.org/grpc"
 
 	"github.com/spacemeshos/go-spacemesh/common/types"
+
+	"github.com/spacemeshos/node-mock/utils"
+
+	v1 "github.com/spacemeshos/api/release/go/spacemesh/v1"
 )
 
 // Configuration -
@@ -51,28 +53,28 @@ type Configuration struct {
 // Config -
 var Config *Configuration
 
-var nodeStatus = spacemesh.NodeStatus{
-	KnownPeers:    1,
-	MinPeers:      1,
-	MaxPeers:      1,
+var nodeStatus = v1.NodeStatus{
 	IsSynced:      false,
 	SyncedLayer:   0,
-	CurrentLayer:  0,
 	VerifiedLayer: 0,
 }
 
-var nodeError spacemesh.NodeError
+var currentLayerNumber = 0
+
+var layerDuration = 500
+
+var nodeError v1.NodeError
 
 var genesisTime = time.Now()
 
 var currentEpoch uint64
 
-var currentLayer = &spacemesh.Layer{}
+var currentLayer = &v1.Layer{}
 
 type transactionInfo struct {
-	Transaction spacemesh.Transaction
-	State       spacemesh.TransactionState
-	Receipt     spacemesh.TransactionReceipt
+	Transaction v1.Transaction
+	State       v1.TransactionState
+	Receipt     v1.TransactionReceipt
 }
 
 // node
@@ -81,8 +83,8 @@ var syncStatusBus utils.Bus
 //mesh
 var layerBus utils.Bus
 
-var layers []*spacemesh.Layer
-var blocks []spacemesh.Block
+var layers []*v1.Layer
+var blocks []v1.Block
 var transactions []transactionInfo
 
 // global
@@ -90,21 +92,21 @@ var rewardBus utils.Bus
 var transactionStateBus utils.Bus
 var transactionReceiptBus utils.Bus
 
-var accounts []spacemesh.Account
-var rewards []spacemesh.Reward
+var accounts []v1.Account
+var rewards []v1.Reward
 
-var smeshers []spacemesh.SmesherId
+var smeshers []v1.SmesherId
 
-func createAccount() (account spacemesh.Account) {
+func createAccount() (account v1.Account) {
 	publicKey, _, _ := ed25519.GenerateKey(nil)
 
 	//rand.New(rand.NewSource(time.Now().UnixNano()))
 
-	accountID := spacemesh.AccountId{
+	accountID := v1.AccountId{
 		Address: publicKey,
 	}
 
-	account = spacemesh.Account{
+	account = v1.Account{
 		Address: &accountID,
 	}
 
@@ -121,30 +123,30 @@ func getRandomBuffer(l int) []byte {
 	return result
 }
 
-func getTransactionState() (result spacemesh.TransactionState_TransactionStateType) {
+/*func getTransactionState() (result v1.TransactionState_TransactionStateType) {
 	if rand.Float64() < 0.9 {
-		result = spacemesh.TransactionState_PROCESSED
+		result = v1.TransactionState_PROCESSED
 	} else {
-		result = (spacemesh.TransactionState_TransactionStateType)(rand.Intn(3) + 2)
+		result = (v1.TransactionState_TransactionStateType)(rand.Intn(3) + 2)
 	}
 
 	return
-}
+}*/
 
-func transactionStateToResult(state spacemesh.TransactionState_TransactionStateType) spacemesh.TransactionReceipt_TransactionResult {
+/*func transactionStateToResult(state v1.TransactionState_TransactionStateType) spacemesh.TransactionReceipt_TransactionResult {
 	switch state {
-	case spacemesh.TransactionState_UNDEFINED:
-		return spacemesh.TransactionReceipt_UNDEFINED
-	case spacemesh.TransactionState_UNKNOWN:
-		return spacemesh.TransactionReceipt_UNKNOWN
-	case spacemesh.TransactionState_PROCESSED:
-		return spacemesh.TransactionReceipt_EXECUTED
-	case spacemesh.TransactionState_INSUFFICIENT_FUNDS:
-		return spacemesh.TransactionReceipt_INSUFFICIENT_FUNDS
+	case v1.TransactionState_UNDEFINED:
+		return v1.TransactionReceipt_UNDEFINED
+	case v1.TransactionState_UNKNOWN:
+		return v1.TransactionReceipt_UNKNOWN
+	case v1.TransactionState_PROCESSED:
+		return v1.TransactionReceipt_EXECUTED
+	case v1.TransactionState_INSUFFICIENT_FUNDS:
+		return v1.TransactionReceipt_INSUFFICIENT_FUNDS
 	default:
-		return spacemesh.TransactionReceipt_UNDEFINED
+		return v1.TransactionReceipt_UNDEFINED
 	}
-}
+}*/
 
 func generateAtxID() (result types.AtxId) {
 	for i := 0; i < len(result); i++ {
@@ -154,7 +156,7 @@ func generateAtxID() (result types.AtxId) {
 	return
 }
 
-func addrConvert(addr spacemesh.AccountId) (result types.Address) {
+func addrConvert(addr v1.AccountId) (result types.Address) {
 	for i := 0; i < len(result); i++ {
 		result[i] = addr.Address[i]
 	}
@@ -187,33 +189,33 @@ func generateATX(layer uint64) []byte {
 	return result.Bytes()
 }
 
-func generateTransaction(
-	txType spacemesh.Transaction_TransactionType,
+/*func generateTransaction(
+	txType v1.Transaction_TransactionType,
 	layerNumber uint64,
 ) (result *transactionInfo) {
-	tx := spacemesh.Transaction{
+	tx := v1.Transaction{
 		Type: txType,
-		Id: &spacemesh.TransactionId{
+		Id: &v1.TransactionId{
 			Id: getRandomBuffer(32),
 		},
 	}
 
-	txState := spacemesh.TransactionState{
+	txState := v1.TransactionState{
 		Id: tx.Id,
 	}
 
-	if txType == spacemesh.Transaction_SIMPLE {
+	if txType == v1.Transaction_SIMPLE {
 		txState.State = getTransactionState()
 	} else {
-		txState.State = spacemesh.TransactionState_PROCESSED
+		txState.State = v1.TransactionState_PROCESSED
 	}
 
 	result = &transactionInfo{
 		Transaction: tx,
-		State: spacemesh.TransactionState{
+		State: v1.TransactionState{
 			State: txState.State,
 		},
-		Receipt: spacemesh.TransactionReceipt{
+		Receipt: v1.TransactionReceipt{
 			Id:          txState.Id,
 			Result:      transactionStateToResult(txState.State),
 			GasUsed:     1000,
@@ -221,8 +223,8 @@ func generateTransaction(
 		},
 	}
 
-	if txType == spacemesh.Transaction_ATX {
-		result.Transaction.PrevAtx = &spacemesh.TransactionId{
+	if txType == v1.Transaction_ATX {
+		result.Transaction.PrevAtx = &v1.TransactionId{
 			Id: getRandomBuffer(32),
 		}
 
@@ -230,25 +232,25 @@ func generateTransaction(
 	}
 
 	return
-}
+}*/
 
-func generateTransactions(layer uint64) []*spacemesh.Transaction {
+/*func generateTransactions(layer uint64) []*v1.Transaction {
 	count := rand.Intn(Config.Transactions.Max-Config.Transactions.Min) + Config.Transactions.Min
 
-	result := make([]*spacemesh.Transaction, count)
+	result := make([]*v1.Transaction, count)
 
 	var txInfo *transactionInfo
 
 	for i := 0; i < count; i++ {
 		if i == 0 {
-			txInfo = generateTransaction(spacemesh.Transaction_ATX, layer)
+			txInfo = generateTransaction(v1.Transaction_ATX, layer)
 		} else {
-			txInfo = generateTransaction(spacemesh.Transaction_SIMPLE, layer)
+			txInfo = generateTransaction(v1.Transaction_SIMPLE, layer)
 		}
 
 		transactionStateBus.Send(txInfo.State)
 
-		if txInfo.Receipt.Result != spacemesh.TransactionReceipt_UNKNOWN {
+		if txInfo.Receipt.Result != v1.TransactionReceipt_UNKNOWN {
 			transactionReceiptBus.Send(txInfo.Receipt)
 		}
 
@@ -261,14 +263,14 @@ func generateTransactions(layer uint64) []*spacemesh.Transaction {
 	}
 
 	return result
-}
+}*/
 
-func generateBlocks(layer uint64) []*spacemesh.Block {
+/*func generateBlocks(layer uint64) []*v1.Block {
 	count := rand.Intn(Config.Blocks.Max-Config.Blocks.Min) + Config.Blocks.Min
-	result := make([]*spacemesh.Block, count)
+	result := make([]*v1.Block, count)
 
 	for i := 0; i < count; i++ {
-		block := spacemesh.Block{
+		block := v1.Block{
 			Id:           getRandomBuffer(32),
 			Transactions: generateTransactions(layer),
 		}
@@ -279,9 +281,9 @@ func generateBlocks(layer uint64) []*spacemesh.Block {
 	}
 
 	return result
-}
+}*/
 
-func getAccount() *spacemesh.AccountId {
+func getAccount() *v1.AccountId {
 	if len(accounts) < 100 {
 		return createAccount().Address
 	}
@@ -292,12 +294,12 @@ func generateRewards(layer uint64) {
 	count := rand.Intn(Config.Rewards.Max-Config.Rewards.Min) + Config.Rewards.Min
 
 	for i := 0; i < count; i++ {
-		reward := spacemesh.Reward{
+		reward := v1.Reward{
 			Layer: layer,
-			Total: &spacemesh.Amount{
+			Total: &v1.Amount{
 				Value: 10,
 			},
-			LayerReward: &spacemesh.Amount{
+			LayerReward: &v1.Amount{
 				Value: 9,
 			},
 			LayerComputed: layer,
@@ -311,7 +313,7 @@ func generateRewards(layer uint64) {
 	}
 }
 
-func createLayer() {
+/*func createLayer() {
 	var layerNumber uint64
 
 	if len(layers) != 0 {
@@ -322,16 +324,16 @@ func createLayer() {
 		layerNumber = 0
 	}
 
-	currentLayer = &spacemesh.Layer{
+	currentLayer = &v1.Layer{
 		Number:        layerNumber,
-		Status:        spacemesh.Layer_UNKNOWN,
+		Status:        v1.Layer_UNKNOWN,
 		Hash:          getRandomBuffer(32),
 		Blocks:        generateBlocks(layerNumber),
 		RootStateHash: getRandomBuffer(32),
 	}
 
 	if !nodeStatus.IsSynced {
-		currentLayer.Status = spacemesh.Layer_CONFIRMED
+		currentLayer.Status = v1.Layer_CONFIRMED
 	}
 
 	layerBus.Send(*currentLayer)
@@ -339,9 +341,9 @@ func createLayer() {
 	generateRewards(currentLayer.Number)
 
 	layers = append(layers, currentLayer)
-}
+}*/
 
-func getLayerStatus(status spacemesh.Layer_LayerStatus) int {
+func getLayerStatus(status v1.Layer_LayerStatus) int {
 	var result int
 
 	for _, v := range layers {
@@ -353,13 +355,13 @@ func getLayerStatus(status spacemesh.Layer_LayerStatus) int {
 	return result
 }
 
-func updateLayers() {
-	al := getLayerStatus(spacemesh.Layer_APPROVED)
+/*func updateLayers() {
+	al := getLayerStatus(v1.Layer_APPROVED)
 
 	if al > Config.Layers.MaxApproved {
 		for _, v := range layers {
-			if v.Status == spacemesh.Layer_APPROVED {
-				v.Status = spacemesh.Layer_CONFIRMED
+			if v.Status == v1.Layer_APPROVED {
+				v.Status = v1.Layer_CONFIRMED
 
 				layerBus.Send(*v)
 
@@ -375,15 +377,15 @@ func updateLayers() {
 	}
 
 	for _, v := range layers {
-		if v.Status == spacemesh.Layer_UNKNOWN {
-			v.Status = spacemesh.Layer_APPROVED
+		if v.Status == v1.Layer_UNKNOWN {
+			v.Status = v1.Layer_APPROVED
 
 			layerBus.Send(*v)
 		}
 	}
-}
+}*/
 
-func startLoadProducer() {
+/*func startLoadProducer() {
 	for {
 		updateLayers()
 
@@ -391,8 +393,8 @@ func startLoadProducer() {
 
 		if (!nodeStatus.IsSynced) && (len(layers) == Config.Threshold.Sync) {
 			syncStatusBus.Send(
-				spacemesh.NodeSyncStatus{
-					Status: spacemesh.NodeSyncStatus_SYNCED,
+				v1.NodeSyncStatus{
+					Status: v1.NodeSyncStatus_SYNCED,
 				},
 			)
 
@@ -405,10 +407,10 @@ func startLoadProducer() {
 			time.Sleep((time.Duration)(Config.Threshold.After) * time.Millisecond)
 		}
 	}
-}
+}*/
 
-func createSmesher() *spacemesh.SmesherId {
-	var smesher spacemesh.SmesherId
+func createSmesher() *v1.SmesherId {
+	var smesher v1.SmesherId
 
 	accountID := getAccount()
 
@@ -417,7 +419,7 @@ func createSmesher() *spacemesh.SmesherId {
 	return &smesher
 }
 
-func getSmesher() *spacemesh.SmesherId {
+func getSmesher() *v1.SmesherId {
 	return &smeshers[rand.Intn(len(smeshers))]
 }
 

@@ -4,10 +4,10 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/spacemeshos/node-mock/spacemesh"
+	v1 "github.com/spacemeshos/api/release/go/spacemesh/v1"
 )
 
-func printLayers(layers *[]spacemesh.Layer) {
+func printLayers(layers *[]v1.Layer) {
 	fmt.Println("-- Layers --")
 
 	for _, v := range *layers {
@@ -17,7 +17,7 @@ func printLayers(layers *[]spacemesh.Layer) {
 	fmt.Println("-- ------ --")
 }
 
-func printAccounts(accounts *[]spacemesh.Account) {
+func printAccounts(accounts *[]v1.Account) {
 	fmt.Println("- Accounts -")
 
 	for _, v := range *accounts {
