@@ -1,6 +1,7 @@
 package services
 
 import (
+	"golang.org/x/exp/errors/fmt"
 	"google.golang.org/grpc"
 
 	context "context"
@@ -96,8 +97,25 @@ func (s GlobalStateService) AppEventStream(request *v1.AppEventStreamRequest, se
 }
 
 // GlobalStateStream New global state computed for a layer by the STF
-func (s GlobalStateService) GlobalStateStream(request *v1.GlobalStateStreamRequest, server v1.GlobalStateService_GlobalStateStreamServer) error {
-	return nil
+func (s GlobalStateService) GlobalStateStream(request *v1.GlobalStateStreamRequest, server v1.GlobalStateService_GlobalStateStreamServer) (err error) {
+	globalStateChan, cookie := globalStateBus.Register()
+	defer globalStateBus.Delete(cookie)
+
+	for {
+		select {
+		case msg := <-globalStateChan:
+			state := msg.(*v1.GlobalStateStreamResponse)
+
+			err = server.Send(state)
+			if err != nil {
+				fmt.Printf("GlobalStateStream((ERROR): %v\n", err)
+
+				return
+			}
+
+			fmt.Printf("GlobalStateStream((OK): %d\n", len(state.DataItem))
+		}
+	}
 }
 
 // TransactionStateStream Transaction State - rejected pre-STF, or pending STF, or processed by STF

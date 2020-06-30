@@ -1,8 +1,6 @@
 package services
 
 import (
-	"bytes"
-	"encoding/json"
 	"math/rand"
 	"time"
 
@@ -53,10 +51,18 @@ type Configuration struct {
 // Config -
 var Config *Configuration
 
+const statusStopped = 0
+const statusSyncing = 1
+const statusSynced = 2
+
+var internalStatus = statusStopped
+
 var nodeStatus = v1.NodeStatus{
-	IsSynced:      false,
-	SyncedLayer:   0,
-	VerifiedLayer: 0,
+	ConnectedPeers: 0,
+	IsSynced:       false,
+	SyncedLayer:    0,
+	TopLayer:       0,
+	VerifiedLayer:  0,
 }
 
 var currentLayerNumber = 0
@@ -84,16 +90,18 @@ var syncStatusBus utils.Bus
 var layerBus utils.Bus
 
 var layers []*v1.Layer
-var blocks []v1.Block
-var transactions []transactionInfo
+var activations []*v1.Activation
+var blocks []*v1.Block
+var transactions []*transactionInfo
 
 // global
 var rewardBus utils.Bus
 var transactionStateBus utils.Bus
 var transactionReceiptBus utils.Bus
+var globalStateBus utils.Bus
 
-var accounts []v1.Account
-var rewards []v1.Reward
+var accounts []*v1.Account
+var rewards []*v1.Reward
 
 var smeshers []v1.SmesherId
 
@@ -110,7 +118,7 @@ func createAccount() (account v1.Account) {
 		Address: &accountID,
 	}
 
-	accounts = append(accounts, account)
+	accounts = append(accounts, &account)
 
 	return
 }
@@ -123,30 +131,28 @@ func getRandomBuffer(l int) []byte {
 	return result
 }
 
-/*func getTransactionState() (result v1.TransactionState_TransactionStateType) {
+func getTransactionState() (result v1.TransactionState_TransactionState) {
 	if rand.Float64() < 0.9 {
-		result = v1.TransactionState_PROCESSED
+		result = v1.TransactionState_TRANSACTION_STATE_PROCESSED
 	} else {
-		result = (v1.TransactionState_TransactionStateType)(rand.Intn(3) + 2)
+		result = (v1.TransactionState_TransactionState)(rand.Intn(4) + 1)
 	}
 
 	return
-}*/
+}
 
-/*func transactionStateToResult(state v1.TransactionState_TransactionStateType) spacemesh.TransactionReceipt_TransactionResult {
+func transactionStateToResult(state v1.TransactionState_TransactionState) v1.TransactionReceipt_TransactionResult {
 	switch state {
-	case v1.TransactionState_UNDEFINED:
-		return v1.TransactionReceipt_UNDEFINED
-	case v1.TransactionState_UNKNOWN:
-		return v1.TransactionReceipt_UNKNOWN
-	case v1.TransactionState_PROCESSED:
-		return v1.TransactionReceipt_EXECUTED
-	case v1.TransactionState_INSUFFICIENT_FUNDS:
-		return v1.TransactionReceipt_INSUFFICIENT_FUNDS
+	case v1.TransactionState_TRANSACTION_STATE_UNSPECIFIED:
+		return v1.TransactionReceipt_TRANSACTION_RESULT_UNSPECIFIED
+	case v1.TransactionState_TRANSACTION_STATE_PROCESSED:
+		return v1.TransactionReceipt_TRANSACTION_RESULT_EXECUTED
+	case v1.TransactionState_TRANSACTION_STATE_INSUFFICIENT_FUNDS:
+		return v1.TransactionReceipt_TRANSACTION_RESULT_INSUFFICIENT_FUNDS
 	default:
-		return v1.TransactionReceipt_UNDEFINED
+		return v1.TransactionReceipt_TRANSACTION_RESULT_UNSPECIFIED
 	}
-}*/
+}
 
 func generateAtxID() (result types.AtxId) {
 	for i := 0; i < len(result); i++ {
@@ -156,7 +162,7 @@ func generateAtxID() (result types.AtxId) {
 	return
 }
 
-func addrConvert(addr v1.AccountId) (result types.Address) {
+func addrConvert(addr *v1.AccountId) (result types.Address) {
 	for i := 0; i < len(result); i++ {
 		result[i] = addr.Address[i]
 	}
@@ -164,7 +170,7 @@ func addrConvert(addr v1.AccountId) (result types.Address) {
 	return
 }
 
-func generateATX(layer uint64) []byte {
+/*func generateATX(layer uint64) []byte {
 	account := getAccount()
 
 	data := types.ActivationTxHeader{
@@ -176,7 +182,7 @@ func generateATX(layer uint64) []byte {
 			PubLayerIdx:          (types.LayerID)(layer),
 			CommitmentMerkleRoot: getRandomBuffer(32),
 		},
-		Coinbase:      addrConvert(*account),
+		Coinbase:      addrConvert(account),
 		ActiveSetSize: (uint32)(rand.Intn(5)),
 	}
 
@@ -187,31 +193,22 @@ func generateATX(layer uint64) []byte {
 	encoder.Encode(&data)
 
 	return result.Bytes()
-}
+}*/
 
-/*func generateTransaction(
-	txType v1.Transaction_TransactionType,
-	layerNumber uint64,
-) (result *transactionInfo) {
-	tx := v1.Transaction{
-		Type: txType,
-		Id: &v1.TransactionId{
-			Id: getRandomBuffer(32),
-		},
+func generateTransaction(layerNumber uint64) (result *transactionInfo) {
+	id := &v1.TransactionId{
+		Id: getRandomBuffer(32),
 	}
 
 	txState := v1.TransactionState{
-		Id: tx.Id,
-	}
-
-	if txType == v1.Transaction_SIMPLE {
-		txState.State = getTransactionState()
-	} else {
-		txState.State = v1.TransactionState_PROCESSED
+		Id:    id,
+		State: getTransactionState(),
 	}
 
 	result = &transactionInfo{
-		Transaction: tx,
+		Transaction: v1.Transaction{
+			Id: id,
+		},
 		State: v1.TransactionState{
 			State: txState.State,
 		},
@@ -223,18 +220,10 @@ func generateATX(layer uint64) []byte {
 		},
 	}
 
-	if txType == v1.Transaction_ATX {
-		result.Transaction.PrevAtx = &v1.TransactionId{
-			Id: getRandomBuffer(32),
-		}
-
-		result.Transaction.Data = generateATX(layerNumber)
-	}
-
 	return
-}*/
+}
 
-/*func generateTransactions(layer uint64) []*v1.Transaction {
+func generateTransactions(layer uint64) []*v1.Transaction {
 	count := rand.Intn(Config.Transactions.Max-Config.Transactions.Min) + Config.Transactions.Min
 
 	result := make([]*v1.Transaction, count)
@@ -242,30 +231,23 @@ func generateATX(layer uint64) []byte {
 	var txInfo *transactionInfo
 
 	for i := 0; i < count; i++ {
-		if i == 0 {
-			txInfo = generateTransaction(v1.Transaction_ATX, layer)
-		} else {
-			txInfo = generateTransaction(v1.Transaction_SIMPLE, layer)
+		txInfo = generateTransaction(layer)
+
+		transactionStateBus.Send(&txInfo.State)
+
+		if txInfo.Receipt.Result != v1.TransactionReceipt_TRANSACTION_RESULT_UNSPECIFIED {
+			transactionReceiptBus.Send(&txInfo.Receipt)
 		}
 
-		transactionStateBus.Send(txInfo.State)
-
-		if txInfo.Receipt.Result != v1.TransactionReceipt_UNKNOWN {
-			transactionReceiptBus.Send(txInfo.Receipt)
-		}
-
-		transactions = append(
-			transactions,
-			*txInfo,
-		)
+		transactions = append(transactions, txInfo)
 
 		result[i] = &txInfo.Transaction
 	}
 
 	return result
-}*/
+}
 
-/*func generateBlocks(layer uint64) []*v1.Block {
+func generateBlocks(layer uint64) []*v1.Block {
 	count := rand.Intn(Config.Blocks.Max-Config.Blocks.Min) + Config.Blocks.Min
 	result := make([]*v1.Block, count)
 
@@ -275,13 +257,31 @@ func generateATX(layer uint64) []byte {
 			Transactions: generateTransactions(layer),
 		}
 
-		blocks = append(blocks, block)
+		blocks = append(blocks, &block)
 
 		result[i] = &block
 	}
 
 	return result
-}*/
+}
+
+func generateActivations(layer uint64) []*v1.Activation {
+	count := rand.Intn(Config.Blocks.Max-Config.Blocks.Min) + Config.Blocks.Min
+	result := make([]*v1.Activation, count)
+
+	for i := 0; i < count; i++ {
+		activation := v1.Activation{
+			Id:    &v1.ActivationId{Id: getRandomBuffer(32)},
+			Layer: layer,
+		}
+
+		activations = append(activations, &activation)
+
+		result[i] = &activation
+	}
+
+	return result
+}
 
 func getAccount() *v1.AccountId {
 	if len(accounts) < 100 {
@@ -307,41 +307,11 @@ func generateRewards(layer uint64) {
 			Smesher:       getSmesher(),
 		}
 
-		rewards = append(rewards, reward)
+		rewards = append(rewards, &reward)
 
-		rewardBus.Send(reward)
+		rewardBus.Send(&reward)
 	}
 }
-
-/*func createLayer() {
-	var layerNumber uint64
-
-	if len(layers) != 0 {
-		nodeStatus.CurrentLayer++
-
-		layerNumber = nodeStatus.CurrentLayer
-	} else {
-		layerNumber = 0
-	}
-
-	currentLayer = &v1.Layer{
-		Number:        layerNumber,
-		Status:        v1.Layer_UNKNOWN,
-		Hash:          getRandomBuffer(32),
-		Blocks:        generateBlocks(layerNumber),
-		RootStateHash: getRandomBuffer(32),
-	}
-
-	if !nodeStatus.IsSynced {
-		currentLayer.Status = v1.Layer_CONFIRMED
-	}
-
-	layerBus.Send(*currentLayer)
-
-	generateRewards(currentLayer.Number)
-
-	layers = append(layers, currentLayer)
-}*/
 
 func getLayerStatus(status v1.Layer_LayerStatus) int {
 	var result int
@@ -355,15 +325,15 @@ func getLayerStatus(status v1.Layer_LayerStatus) int {
 	return result
 }
 
-/*func updateLayers() {
-	al := getLayerStatus(v1.Layer_APPROVED)
+func updateLayers() {
+	al := getLayerStatus(v1.Layer_LAYER_STATUS_APPROVED)
 
 	if al > Config.Layers.MaxApproved {
 		for _, v := range layers {
-			if v.Status == v1.Layer_APPROVED {
-				v.Status = v1.Layer_CONFIRMED
+			if v.Status == v1.Layer_LAYER_STATUS_APPROVED {
+				v.Status = v1.Layer_LAYER_STATUS_CONFIRMED
 
-				layerBus.Send(*v)
+				layerBus.Send(v)
 
 				generateRewards(v.Number)
 
@@ -377,24 +347,59 @@ func getLayerStatus(status v1.Layer_LayerStatus) int {
 	}
 
 	for _, v := range layers {
-		if v.Status == v1.Layer_UNKNOWN {
-			v.Status = v1.Layer_APPROVED
+		if v.Status == v1.Layer_LAYER_STATUS_UNSPECIFIED {
+			v.Status = v1.Layer_LAYER_STATUS_APPROVED
 
-			layerBus.Send(*v)
+			layerBus.Send(v)
 		}
 	}
-}*/
+}
 
-/*func startLoadProducer() {
+func createLayer() {
+	var layerNumber uint64
+
+	if len(layers) != 0 {
+		nodeStatus.TopLayer++
+
+		layerNumber = nodeStatus.TopLayer
+	} else {
+		layerNumber = 0
+	}
+
+	currentLayer = &v1.Layer{
+		Number:        layerNumber,
+		Status:        v1.Layer_LAYER_STATUS_UNSPECIFIED,
+		Hash:          getRandomBuffer(32),
+		Blocks:        generateBlocks(layerNumber),
+		Activations:   generateActivations(layerNumber),
+		RootStateHash: getRandomBuffer(32),
+	}
+
+	if !nodeStatus.IsSynced {
+		currentLayer.Status = v1.Layer_LAYER_STATUS_CONFIRMED
+	}
+
+	layerBus.Send(currentLayer)
+
+	generateRewards(currentLayer.Number)
+
+	layers = append(layers, currentLayer)
+}
+
+func startLoadProducer() {
 	for {
 		updateLayers()
 
 		createLayer()
 
 		if (!nodeStatus.IsSynced) && (len(layers) == Config.Threshold.Sync) {
+			internalStatus = statusSynced
+
+			nodeStatus.IsSynced = true
+
 			syncStatusBus.Send(
-				v1.NodeSyncStatus{
-					Status: v1.NodeSyncStatus_SYNCED,
+				&v1.StatusStreamResponse{
+					Status: &nodeStatus,
 				},
 			)
 
@@ -407,7 +412,7 @@ func getLayerStatus(status v1.Layer_LayerStatus) int {
 			time.Sleep((time.Duration)(Config.Threshold.After) * time.Millisecond)
 		}
 	}
-}*/
+}
 
 func createSmesher() *v1.SmesherId {
 	var smesher v1.SmesherId
@@ -442,6 +447,8 @@ func InitMocker(server *grpc.Server) {
 
 	syncStatusBus.Init()
 	layerBus.Init()
+	globalStateBus.Init()
+
 	rewardBus.Init()
 	transactionStateBus.Init()
 	transactionReceiptBus.Init()

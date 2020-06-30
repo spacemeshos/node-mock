@@ -67,8 +67,14 @@ func (s MeshService) AccountMeshDataQuery(ctx context.Context, request *v1.Accou
 }
 
 // LayersQuery Layers data query
-func (s MeshService) LayersQuery(ctx context.Context, request *v1.LayersQueryRequest) (*v1.LayersQueryResponse, error) {
-	return &v1.LayersQueryResponse{}, nil
+func (s MeshService) LayersQuery(ctx context.Context, request *v1.LayersQueryRequest) (result *v1.LayersQueryResponse, err error) {
+	result = new(v1.LayersQueryResponse)
+
+	for i := request.StartLayer; i <= request.EndLayer; i++ {
+		result.Layer = append(result.Layer, layers[i])
+	}
+
+	return
 }
 
 // Setream API =====
@@ -87,9 +93,9 @@ func (s MeshService) LayerStream(request *v1.LayerStreamRequest, server v1.MeshS
 	for {
 		select {
 		case msg := <-layerChan:
-			response := msg.(v1.LayerStreamResponse)
+			response := msg.(*v1.LayerStreamResponse)
 
-			err = server.Send(&response)
+			err = server.Send(response)
 			if err != nil {
 				fmt.Printf("LayerStream(ERROR): %v\n", err)
 
@@ -97,7 +103,6 @@ func (s MeshService) LayerStream(request *v1.LayerStreamRequest, server v1.MeshS
 			}
 
 			fmt.Printf("LayerStream(OK): %d - %s\n", response.Layer.GetNumber(), response.Layer.GetStatus().String())
-
 		}
 	}
 }

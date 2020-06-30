@@ -8,6 +8,8 @@ import (
 	"google.golang.org/grpc"
 
 	v1 "github.com/spacemeshos/api/release/go/spacemesh/v1"
+
+	status "google.golang.org/genproto/googleapis/rpc/status"
 )
 
 // NodeService -
@@ -40,38 +42,60 @@ func (s NodeService) Status(ctx context.Context, request *v1.StatusRequest) (*v1
 }
 
 // SyncStart request that the node start syncing the mesh
-func (s NodeService) SyncStart(ctx context.Context, request *v1.SyncStartRequest) (*v1.SyncStartResponse, error) {
-	if len(layers) == 0 {
+func (s NodeService) SyncStart(ctx context.Context, request *v1.SyncStartRequest) (result *v1.SyncStartResponse, err error) {
+	switch internalStatus {
+	case statusStopped:
 		fmt.Printf("NodeService.SyncStart\n")
 
-		/*syncStatusBus.Send(
-			v1.NodeSyncStatus{
-				Status: v1.NodeSyncStatus_SYNCING,
-			},
-		)*/
-
 		//go startLoadProducer()
+
+		internalStatus = statusSyncing
+
+		result.Status = &status.Status{Code: 0, Message: "sync started"}
+	case statusSyncing:
+		result.Status = &status.Status{Code: 1, Message: "sync already started"}
+	case statusSynced:
+		result.Status = &status.Status{Code: 2, Message: "already synched"}
 	}
 
-	return &v1.SyncStartResponse{}, nil
+	return
 }
 
 // Shutdown Request that the node initiate graceful shutdown
-func (s NodeService) Shutdown(ctx context.Context, request *v1.ShutdownRequest) (*v1.ShutdownResponse, error) {
-	return &v1.ShutdownResponse{}, nil
+func (s NodeService) Shutdown(ctx context.Context, request *v1.ShutdownRequest) (result *v1.ShutdownResponse, err error) {
+	switch internalStatus {
+	case statusStopped:
+		result.Status = &status.Status{Code: 1, Message: "sync already stopped"}
+	case statusSyncing, statusSynced:
+		internalStatus = statusStopped
+
+		if !nodeStatus.IsSynced {
+			nodeStatus.IsSynced = false
+
+			syncStatusBus.Send(
+				&v1.StatusStreamResponse{
+					Status: &nodeStatus,
+				},
+			)
+		}
+
+		result.Status = &status.Status{Code: 0, Message: "sync stopped"}
+	}
+
+	return
 }
 
 // StatusStream sync status events
 func (s NodeService) StatusStream(request *v1.StatusStreamRequest, server v1.NodeService_StatusStreamServer) (err error) {
-	/*syncStatusChan, cookie := syncStatusBus.Register()
+	syncStatusChan, cookie := syncStatusBus.Register()
 	defer syncStatusBus.Delete(cookie)
 
 	for {
 		select {
 		case msg := <-syncStatusChan:
-			syncStatus := msg.(v1.NodeSyncStatus)
+			syncStatus := msg.(*v1.StatusStreamResponse)
 
-			err = server.Send(&syncStatus)
+			err = server.Send(syncStatus)
 			if err != nil {
 				fmt.Printf("SyncStatusStream(ERROR): %v\n", err)
 
@@ -81,9 +105,7 @@ func (s NodeService) StatusStream(request *v1.StatusStreamRequest, server v1.Nod
 			fmt.Printf("SyncStatusStream(OK): %v\n", syncStatus)
 
 		}
-	}*/
-
-	return nil
+	}
 }
 
 // ErrorStream node error events
