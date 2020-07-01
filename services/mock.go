@@ -397,11 +397,7 @@ func startLoadProducer() {
 
 			nodeStatus.IsSynced = true
 
-			syncStatusBus.Send(
-				&v1.StatusStreamResponse{
-					Status: &nodeStatus,
-				},
-			)
+			syncStatusBus.Send(&nodeStatus)
 
 			nodeStatus.IsSynced = true
 		}

@@ -93,7 +93,11 @@ func (s MeshService) LayerStream(request *v1.LayerStreamRequest, server v1.MeshS
 	for {
 		select {
 		case msg := <-layerChan:
-			response := msg.(*v1.LayerStreamResponse)
+			layer := msg.(*v1.Layer)
+
+			response := &v1.LayerStreamResponse{
+				Layer: layer,
+			}
 
 			err = server.Send(response)
 			if err != nil {

@@ -47,15 +47,21 @@ func (s NodeService) SyncStart(ctx context.Context, request *v1.SyncStartRequest
 	case statusStopped:
 		fmt.Printf("NodeService.SyncStart\n")
 
-		//go startLoadProducer()
+		go startLoadProducer()
 
 		internalStatus = statusSyncing
 
-		result.Status = &status.Status{Code: 0, Message: "sync started"}
+		result = &v1.SyncStartResponse{
+			Status: &status.Status{Code: 0, Message: "sync started"},
+		}
 	case statusSyncing:
-		result.Status = &status.Status{Code: 1, Message: "sync already started"}
+		result = &v1.SyncStartResponse{
+			Status: &status.Status{Code: 1, Message: "sync already started"},
+		}
 	case statusSynced:
-		result.Status = &status.Status{Code: 2, Message: "already synched"}
+		result = &v1.SyncStartResponse{
+			Status: &status.Status{Code: 2, Message: "already synched"},
+		}
 	}
 
 	return
@@ -65,21 +71,21 @@ func (s NodeService) SyncStart(ctx context.Context, request *v1.SyncStartRequest
 func (s NodeService) Shutdown(ctx context.Context, request *v1.ShutdownRequest) (result *v1.ShutdownResponse, err error) {
 	switch internalStatus {
 	case statusStopped:
-		result.Status = &status.Status{Code: 1, Message: "sync already stopped"}
+		result = &v1.ShutdownResponse{
+			Status: &status.Status{Code: 1, Message: "sync already stopped"},
+		}
 	case statusSyncing, statusSynced:
 		internalStatus = statusStopped
 
 		if !nodeStatus.IsSynced {
 			nodeStatus.IsSynced = false
 
-			syncStatusBus.Send(
-				&v1.StatusStreamResponse{
-					Status: &nodeStatus,
-				},
-			)
+			syncStatusBus.Send(&nodeStatus)
 		}
 
-		result.Status = &status.Status{Code: 0, Message: "sync stopped"}
+		result = &v1.ShutdownResponse{
+			Status: &status.Status{Code: 0, Message: "sync stopped"},
+		}
 	}
 
 	return
@@ -93,16 +99,20 @@ func (s NodeService) StatusStream(request *v1.StatusStreamRequest, server v1.Nod
 	for {
 		select {
 		case msg := <-syncStatusChan:
-			syncStatus := msg.(*v1.StatusStreamResponse)
+			status := msg.(*v1.NodeStatus)
 
-			err = server.Send(syncStatus)
+			statusReponse := &v1.StatusStreamResponse{
+				Status: status,
+			}
+
+			err = server.Send(statusReponse)
 			if err != nil {
 				fmt.Printf("SyncStatusStream(ERROR): %v\n", err)
 
 				return
 			}
 
-			fmt.Printf("SyncStatusStream(OK): %v\n", syncStatus)
+			fmt.Printf("SyncStatusStream(OK): %v\n", statusReponse)
 
 		}
 	}
