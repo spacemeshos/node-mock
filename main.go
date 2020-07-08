@@ -22,6 +22,11 @@ var (
 	//Params
 	flagConfig = flag.String("config", "", "(param) config")
 
+    mockNetwork_NetId = flag.Int("mock-network-id", 1, "mock network ID")
+    mockNetwork_EpochNumLayers = flag.Int("mock-network-epoch-layers", 288, "mock network Epoch Num Layers")
+    mockNetwork_MaxTransactionsPerSecond = flag.Int("mock-network-txs", 10, "mock network Max Transactions Per Second")
+    mockNetwork_LayerDuration = flag.Int("mock-network-layer-duration", 15, "mock network Layer Duration")
+
 	//Debug
 )
 
@@ -73,32 +78,30 @@ func NewGrpcService(port uint) *GrpcService {
 }
 
 func startServer(port uint) *GrpcService {
-	grpcService := NewGrpcService(port)
+    grpcService := NewGrpcService(port)
 
-	services.InitMocker(grpcService.Server)
+    services.InitMocker(
+        grpcService.Server,
+        *mockNetwork_NetId,
+        *mockNetwork_EpochNumLayers,
+        *mockNetwork_MaxTransactionsPerSecond,
+        *mockNetwork_LayerDuration,
+    )
 
-	grpcService.startServices()
+    grpcService.startServices()
 
-	return grpcService
+    return grpcService
 }
 
 func main() {
 	flag.Parse()
-
-	var err error
 
 	if len(*flagConfig) == 0 {
 		fmt.Println("ERROR: -config is mandatory")
 		os.Exit(1)
 	}
 
-	services.Config, err = parseConfig(*flagConfig)
-	if err != nil {
-		fmt.Printf("ERROR: %v\n", err)
-		os.Exit(1)
-	}
-
 	if *flagServer {
-		startServer(services.Config.RPCPort)
+		startServer(9990)
 	}
 }
