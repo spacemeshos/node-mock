@@ -15,49 +15,49 @@ type MeshService struct{}
 // GenesisTime Network genesis time as unix epoch time
 func (s MeshService) GenesisTime(ctx context.Context, request *v1.GenesisTimeRequest) (*v1.GenesisTimeResponse, error) {
 	return &v1.GenesisTimeResponse{
-		Unixtime: &v1.SimpleInt{Value: uint64(genesisTime.Unix())},
+		Unixtime: &v1.SimpleInt{Value: network.GenesisTime},
 	}, nil
 }
 
 // CurrentLayer Current layer number
 func (s MeshService) CurrentLayer(ctx context.Context, request *v1.CurrentLayerRequest) (*v1.CurrentLayerResponse, error) {
 	return &v1.CurrentLayerResponse{
-		Layernum: &v1.SimpleInt{Value: uint64(currentLayerNumber)},
+		Layernum: &v1.SimpleInt{Value: network.GetCurrentLayerNumber()},
 	}, nil
 }
 
 // CurrentEpoch Current epoch number
 func (s MeshService) CurrentEpoch(ctx context.Context, request *v1.CurrentEpochRequest) (*v1.CurrentEpochResponse, error) {
 	return &v1.CurrentEpochResponse{
-		Epochnum: &v1.SimpleInt{Value: currentEpoch},
+		Epochnum: &v1.SimpleInt{Value: network.GetCurrentEpochNumber()},
 	}, nil
 }
 
 // NetId Network ID
 func (s MeshService) NetId(ctx context.Context, request *v1.NetIdRequest) (*v1.NetIdResponse, error) {
 	return &v1.NetIdResponse{
-		Netid: &v1.SimpleInt{Value: Config.NetID},
+		Netid: &v1.SimpleInt{Value: network.NetId},
 	}, nil
 }
 
 // EpochNumLayers Number of layers per epoch (a network parameter)
 func (s MeshService) EpochNumLayers(ctx context.Context, request *v1.EpochNumLayersRequest) (*v1.EpochNumLayersResponse, error) {
 	return &v1.EpochNumLayersResponse{
-		Numlayers: &v1.SimpleInt{Value: Config.Layers.PerEpoch},
+		Numlayers: &v1.SimpleInt{Value: network.EpochNumLayers},
 	}, nil
 }
 
 // LayerDuration Layer duration (a network parameter)
 func (s MeshService) LayerDuration(ctx context.Context, request *v1.LayerDurationRequest) (*v1.LayerDurationResponse, error) {
 	return &v1.LayerDurationResponse{
-		Duration: &v1.SimpleInt{Value: uint64(layerDuration)},
+		Duration: &v1.SimpleInt{Value: network.LayerDuration},
 	}, nil
 }
 
 // MaxTransactionsPerSecond Number of transactions per second (a network parameter)
 func (s MeshService) MaxTransactionsPerSecond(ctx context.Context, request *v1.MaxTransactionsPerSecondRequest) (*v1.MaxTransactionsPerSecondResponse, error) {
 	return &v1.MaxTransactionsPerSecondResponse{
-		Maxtxpersecond: &v1.SimpleInt{Value: uint64(Config.Transactions.MaxPerSecond)},
+		Maxtxpersecond: &v1.SimpleInt{Value: network.MaxTransactionsPerSecond},
 	}, nil
 }
 
@@ -71,7 +71,7 @@ func (s MeshService) LayersQuery(ctx context.Context, request *v1.LayersQueryReq
 	result = new(v1.LayersQueryResponse)
 
 	for i := request.StartLayer; i <= request.EndLayer; i++ {
-		result.Layer = append(result.Layer, layers[i])
+		result.Layer = append(result.Layer, network.Layers[i].Export())
 	}
 
 	return
@@ -90,9 +90,12 @@ func (s MeshService) LayerStream(request *v1.LayerStreamRequest, server v1.MeshS
 	layerChan, cookie := layerBus.Register()
 	defer layerBus.Delete(cookie)
 
+	fmt.Printf("LayerStream: started\n")
+
 	for {
 		select {
 		case msg := <-layerChan:
+			fmt.Printf("LayerStream: request\n")
 			layer := msg.(*v1.Layer)
 
 			response := &v1.LayerStreamResponse{

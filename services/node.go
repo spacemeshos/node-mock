@@ -25,14 +25,14 @@ func (s NodeService) Echo(ctx context.Context, request *v1.EchoRequest) (*v1.Ech
 // Version returns the version of the node software as a semver string
 func (s NodeService) Version(ctx context.Context, in *empty.Empty) (*v1.VersionResponse, error) {
 	return &v1.VersionResponse{
-		VersionString: &v1.SimpleString{Value: Config.Version},
+		VersionString: &v1.SimpleString{Value: "1.0"},
 	}, nil
 }
 
 // Build returns the github tag or branch used to build the node
 func (s NodeService) Build(ctx context.Context, in *empty.Empty) (*v1.BuildResponse, error) {
 	return &v1.BuildResponse{
-		BuildString: &v1.SimpleString{Value: Config.Build},
+		BuildString: &v1.SimpleString{Value: "123"},
 	}, nil
 }
 
